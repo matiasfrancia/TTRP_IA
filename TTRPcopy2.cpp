@@ -164,13 +164,6 @@ int getSubrouteDemand(std::vector<string> subroute, std::vector<client> clients,
     return demand;
 }
 
-void printArrayTuples(std::vector<std::tuple<int, int, int>> vector) {
-    for(int i = 0; i < vector.size(); i++) {
-        cout << "{" << get<0>(vector[i]) << ", " << get<1>(vector[i]) << ", " << get<2>(vector[i]) << "}" << ", ";
-    }
-    cout << endl;
-}
-
 std::vector<string> splitByComma(string s) {
 
     string del = ",";
@@ -294,13 +287,11 @@ float f_eval(std::vector<std::vector<int>> matrixSol, std::vector<std::vector<fl
 
         std::vector<std::tuple<int, int, int>> subroutesVec;
         if(subroutes[i].size() > 0) {
-            printArrayTuples(subroutesVec);
             subroutesVec = getSubroutesVector(subroutes[i]);
 
             // restamos a la demanda una vez todas las raíces de subruta
-            
             for(int k = 0; k < subroutesVec.size(); k++) {
-                routeDemand -= clients[get<0>(subroutesVec[k])].demand;
+                routeDemand -= clients[get<0>(subroutesVec[i])].demand;
             }
         }
 
@@ -320,14 +311,14 @@ float f_eval(std::vector<std::vector<int>> matrixSol, std::vector<std::vector<fl
         }
 
         // obtenemos la suma de las demandas de las subrutas
-        subrouteDemand = 0;
-        if(subroutes[i].length() > 0) {
-            subrouteDemand = getTotalDemandSubroutes(subroutes[i], clients, matrixSol[i]);
-        }
+        // subrouteDemand = 0;
+        // if(subroutes[i].size() > 0) {
+        //     subrouteDemand = getTotalDemandSubroutes(subroutes[i], clients, matrixSol[i]);
+        // }
 
-        if(subrouteDemand > transportData.truckCapacity) {
-            eval += (subrouteDemand - transportData.truckCapacity) * penaltySubroute;
-        }
+        // if(subrouteDemand > transportData.truckCapacity) {
+        //     eval += (subrouteDemand - transportData.truckCapacity) * penaltySubroute;
+        // }
     }
 
     return eval;
@@ -428,9 +419,9 @@ int getRandomInVehicleRoute(std::vector<std::tuple<int, int, int>> intervals, in
     }
 }
 
-float getCapacityPenalty(std::vector<std::vector<int>> &matrixSol, float capacity, float capacityTruck, int penalty, int penaltySubroute, 
+float getCapacityPenalty(std::vector<std::vector<int>> &matrixSol, float capacity, int penalty, int penaltySubroute, 
     std::vector<string> subroutes, std::vector<client> clients, int prevRoute, int nextRoute, int prevPos, int nextPos, 
-    int node1, int node2, transport transportData, bool subrouteCreation) {
+    int node1, int node2, transport transportData) {
     
     float newDemandPrev = 0, newDemandNext = 0, demandPrev = 0, demandNext = 0;
     for(int i = 1; i < matrixSol[prevRoute].size()-1; i++) {
@@ -439,18 +430,16 @@ float getCapacityPenalty(std::vector<std::vector<int>> &matrixSol, float capacit
 
     // le restamos los nodos repetidos
     std::vector<std::tuple<int, int, int>> subroutesVec;
-    if(subroutes[prevRoute].length() > 0) {
+    if(subroutes[prevRoute].size() > 0) {
         subroutesVec = getSubroutesVector(subroutes[prevRoute]);
 
         // restamos a la demanda una vez todas las raíces de subruta
         for(int k = 0; k < subroutesVec.size(); k++) {
-            demandPrev -= clients[get<0>(subroutesVec[k])].demand;
+            demandPrev -= clients[get<0>(subroutesVec[prevRoute])].demand;
         }
     }
 
-    // no se hace así en la creación de una subruta
-    if(subrouteCreation) newDemandPrev = demandPrev - clients[node1].demand;
-    else newDemandPrev = demandPrev + clients[node2].demand - clients[node1].demand;
+    newDemandPrev = demandPrev + clients[node2].demand - clients[node1].demand;
 
     // recalculamos capacidad ruta previa con el cambio
     for(int i = 1; i < matrixSol[nextRoute].size()-1; i++) {
@@ -459,19 +448,16 @@ float getCapacityPenalty(std::vector<std::vector<int>> &matrixSol, float capacit
 
     subroutesVec.clear();
 
-    if(subroutes[nextRoute].length() > 0) {
+    if(subroutes[nextRoute].size() > 0) {
         subroutesVec = getSubroutesVector(subroutes[nextRoute]);
-        printArrayTuples(subroutesVec);
 
         // restamos a la demanda una vez todas las raíces de subruta
         for(int k = 0; k < subroutesVec.size(); k++) {
-            cout << get<0>(subroutesVec[k]) << endl;
-            demandNext -= clients[get<0>(subroutesVec[k])].demand;
+            demandNext -= clients[get<0>(subroutesVec[nextRoute])].demand;
         }
     }
 
-    if(subrouteCreation) newDemandNext = demandNext + clients[node1].demand;
-    else newDemandNext = demandNext + clients[node1].demand - clients[node2].demand;
+    newDemandNext = demandNext + clients[node1].demand - clients[node2].demand;
     float newPenalty = 0;
 
     // calculamos la nueva función de evaluación de acuerdo a la ruta prev
@@ -505,23 +491,16 @@ float getCapacityPenalty(std::vector<std::vector<int>> &matrixSol, float capacit
     // si se genera una subruta, se debe verificar que cumpla con que la demanda de la subruta sea menor que la capacidad del camión
     
     // obtenemos la suma de las demandas de las subrutas
-    // en caso de que se esté creando una nueva subruta
-    if(subrouteCreation) {
-        int subrouteDemand = 0, newSubrouteDemand = 0;
-        if(subroutes[nextRoute].length() > 0) {
-            subrouteDemand = getTotalDemandSubroutes(subroutes[nextRoute], clients, matrixSol[nextRoute]);
-            newSubrouteDemand = subrouteDemand + clients[node1].demand;
-        }
+    // int subrouteDemand = 0;
+    // if(subroutes[].size() > 0) {
+    //     subrouteDemand = getTotalDemandSubroutes(subroutes[i], clients, matrixSol[i]);
+    // }
 
-        if(subrouteDemand <= capacityTruck && newSubrouteDemand >= capacityTruck) {
-            newPenalty += (subrouteDemand - capacityTruck) * penaltySubroute;
-        }
-        else if(subrouteDemand > capacityTruck && newSubrouteDemand > capacityTruck) {
-            newPenalty += (newSubrouteDemand - subrouteDemand) * penaltySubroute;
-        }
-    }
+    // if(subrouteDemand > transportData.truckCapacity) {
+    //     newPenalty += (subrouteDemand - transportData.truckCapacity) * penaltySubroute;
+    // }
 
-    return newPenalty;
+    // return newPenalty;
 }
 
 void makeSwap(std::vector<std::vector<int>> &matrixSol, float *initialEval, std::vector<std::vector<float>> distancesM,
@@ -567,13 +546,14 @@ void makeSwap(std::vector<std::vector<int>> &matrixSol, float *initialEval, std:
     }
 
     int penaltySubroute = 200;
-    float capacityTruck = transportData.truckCapacity;
 
-    newEval += getCapacityPenalty(matrixSol, capacity, capacityTruck, penalty, penaltySubroute, subroutes, clients, 
-        prevRoute, nextRoute, prevPos, nextPos, node1, node2, transportData, false);
+    newEval += getCapacityPenalty(matrixSol, capacity, penalty, penaltySubroute, subroutes, clients, 
+        prevRoute, nextRoute, prevPos, nextPos, node1, node2, transportData);
     
     if(newEval < *initialEval) {
         *initialEval = newEval;
+
+        // cout << "Efectuamos el cambio" << endl;
         
         // si prevRoute y nextRoute son distintas
         // borramos los nodos de ambas rutas (vectores)
@@ -589,6 +569,8 @@ void makeSwap(std::vector<std::vector<int>> &matrixSol, float *initialEval, std:
         else {
             swap(matrixSol[prevRoute][prevPos], matrixSol[prevRoute][nextPos]);
         }
+
+        // printMatrix(matrixSol);
     }
 }
 
@@ -656,30 +638,37 @@ void generateSubroute(int iteration, std::vector<std::vector<int>> &matrixSol, f
 
     // TODO: considerar la penalización por demanda de subruta mayor a capacidad camión
     float capacity = transportData.truckCapacity + transportData.trailerCapacity;
-    float capacityTruck = transportData.truckCapacity;
     int penaltyRoute = 500;
     int penaltySubroute = 200;
 
-    cout << "New eval before getCapacityPenalty: " << newEval << endl;
+    // cout << "==== flag " << iteration << " ====" << endl;
+    // cout << "prevRoute: " << prevRoute << " - nextRoute: " << nextRoute << endl;
+    // cout << "prevPos: " << prevPos << " - nextPos: " << nextPos << endl;
 
-    newEval += getCapacityPenalty(matrixSol, capacity, capacityTruck, penaltyRoute, penaltySubroute, subroutes, clients, 
-        prevRoute, nextRoute, prevPos, nextPos, node1, node2, transportData, true);
-
-    cout << "New eval after getCapacityPenalty: " << newEval << endl;
+    newEval += getCapacityPenalty(matrixSol, capacity, penaltyRoute, penaltySubroute, subroutes, clients, 
+        prevRoute, nextRoute, prevPos, nextPos, node1, node2, transportData);
 
     // si la mejora, duplicar el nodo de vehículo escogido e insertar entre ambos el nodo de camión
     if(newEval < *initialEval) {
         *initialEval = newEval;
 
         // eliminamos el nodo de camión de la ruta de camión
-        matrixSol[prevRoute].erase(matrixSol[prevRoute].begin() + prevPos);
+        if(matrixSol[prevRoute].size() > 6) {
+            matrixSol[prevRoute].erase(matrixSol[prevRoute].begin() + prevPos);
+            // replicamos el nodo escogido como raíz e insertamos el nodo de camión en medio
+            matrixSol[nextRoute].insert(matrixSol[nextRoute].begin() + nextPos, node1);
+            matrixSol[nextRoute].insert(matrixSol[nextRoute].begin() + nextPos, node2);
+        }
 
-        // replicamos el nodo escogido como raíz e insertamos el nodo de camión en medio
-        matrixSol[nextRoute].insert(matrixSol[nextRoute].begin() + nextPos, node1);
-        matrixSol[nextRoute].insert(matrixSol[nextRoute].begin() + nextPos, node2);
-
+        // TODO: agregar la nueva subruta a la lista de subrutas
         addSubroute(subroutes, nextRoute, node2, nextPos, nextPos+2);
+        // printArrayString(subroutes);
+        // for(int i = 0; i < subroutes.size(); i++) {
+        //     if(subroutes[i].length() > 0) cout << i << ": " << subroutes[i] << endl;
+        // }
+        // printMatrix(matrixSol);
     }
+
 }
 
 void third_phase(int iteration, std::vector<std::vector<int>> &matrixSol, float *initialEval, transport transportData,
@@ -694,29 +683,32 @@ void third_phase(int iteration, std::vector<std::vector<int>> &matrixSol, float 
     prevRoute = rand() % (transportData.qTrailers-1) + transportData.qTrucks - transportData.qTrailers + 1;
     nextRoute = rand() % (transportData.qTrucks);
 
+    // cout << "Prev route: " << prevRoute << endl;
+    // cout << "Next route: " << nextRoute << endl;
+
     // escogemos un nodo dentro de esa ruta
     int prevPos = rand() % (matrixSol[prevRoute].size() - 3) + 2;
     int nextPos = rand() % (matrixSol[nextRoute].size() - 3) + 2;
+
+    // cout << "Prev Pos: " << prevPos << endl;
+    // cout << "Next Pos: " << nextPos << endl;
 
     float truckCapacity = transportData.truckCapacity;
     int routePenalty = 500;
 
     // si el nodo es de camión, se hace un swap
     if(clients[matrixSol[nextRoute][nextPos]].isTruck == 1) {
-
         makeSwap(matrixSol, initialEval, distancesM, clients, prevRoute, nextRoute, prevPos, nextPos, 
             truckCapacity, routePenalty, transportData, subroutes);
     }
     // si el nodo es de vehículo se prueba crear una subruta a partir de él
     else {
         std::vector<std::tuple<int, int, int>> subroutesVec = getSubroutesVector(subroutes[nextRoute]);
-        bool inSubroute = false;
-
+        bool isRoot = false;
         for(int i = 0; i < subroutesVec.size(); i++) {
-            if(nextPos >= get<1>(subroutesVec[i]) && nextPos <= get<2>(subroutesVec[i])) inSubroute = true;
+            if(get<1>(subroutesVec[i]) == nextPos || get<2>(subroutesVec[i]) == nextPos) isRoot = true;
         }
-        if(!inSubroute && matrixSol[prevRoute].size() >= 5) {
-
+        if(!isRoot && matrixSol[prevRoute].size() >= 5) {
             generateSubroute(iteration, matrixSol, initialEval, distancesM, clients, prevRoute, nextRoute, 
                 prevPos, nextPos, transportData, subroutes);
 
@@ -749,8 +741,8 @@ void third_phase(int iteration, std::vector<std::vector<int>> &matrixSol, float 
 
 void TTRP(transport transportData, std::vector<client> clients, std::vector<std::vector<float>> distancesM) {
     
-    int iters2 = 20;
-    int iters3 = 10;
+    int iters2 = 1000;
+    int iters3 = 1000;
 
     srand(time(NULL));
 
@@ -767,23 +759,48 @@ void TTRP(transport transportData, std::vector<client> clients, std::vector<std:
 
     // SEGUNDA FASE: mejoramos los caminos de vehículo
     for(int i = 0; i < iters2; i++) {
-    
         second_phase(initialSolution, &initialEval, transportData, subroutes, distancesM, clients);
     }
-
-    cout << "Solution evaluation:" << initialEval << endl << endl;
+    
+    cout << "flag" << endl;
 
     printMatrix(initialSolution);
     
     // TERCERA FASE: mejoramos los caminos de camión y creamos nuevas subrutas
     for(int i = 0; i < iters3; i++) {
-
-        // cout << "enter for: " << i << endl;
+    
         third_phase(i, initialSolution, &initialEval, transportData, subroutes, distancesM, clients);
-        // cout << "end for: " << i << endl;
     }
     cout << "Solution evaluation:" << initialEval << endl << endl;
     cout << "f_eval evaluation:" << f_eval(initialSolution, distancesM, clients, transportData, subroutes) << endl << endl;
+
+    // addSubroute(subroutes, 0, 13, 2, 7);
+    // addSubroute(subroutes, 0, 14, 8, 10);
+    // addSubroute(subroutes, 0, 9, 25, 40);
+
+    for(int i = 0; i < subroutes.size(); i++) {
+        cout << i << ": " << subroutes[i] << endl;
+    }
+
+    // std::vector<std::tuple<int, int, int>> subroutesVec = getSubroutesVector(subroutes[0]);
+    
+    // cout << endl;
+    // cout << "[";
+    // for(int i = 0; i < subroutesVec.size(); i++) {
+    //     cout << "{" << get<0>(subroutesVec[i]) << "," << get<1>(subroutesVec[i]) << "," << get<2>(subroutesVec[i]) << "}" << endl;
+    // }
+    // cout << "]" << endl;
+
+    // std::vector<std::tuple<int, int, int>> subroutesTest;
+    
+    // subroutesTest.push_back({4, 4, 8});
+    // subroutesTest.push_back({11, 14, 17});
+    // subroutesTest.push_back({12, 9, 12});
+
+    // printArray(std::vector<int>{0,1,2,3,4,5,6,7,4,12,10,9,12,8,11,15,17,11,20,21,0});
+    
+    // cout << "Returned: " << getRandomInVehicleRoute(subroutesTest, 21) << endl;
+    // cout << "Returned: " << getRandomInVehicleRoute(subroutesTest, 21) << endl;
 }
 
 int main(int argc, char *argv[]) {
